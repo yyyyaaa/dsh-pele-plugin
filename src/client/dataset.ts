@@ -148,7 +148,11 @@ export const diagramsDefinition: ConversationDefinition<DiagramsState | undefine
     // would put this plugin in the assembler's turn index for turns it never
     // touched.
     if (state.diagrams.length === 0) return null
-    if (previous !== undefined
+    // The assembler stores this method's return value and hands it back as
+    // `previous`, so a `null` we return for one scope comes back as `null` on the
+    // next flush. Loose equality is deliberate: `undefined` and `null` both mean
+    // "nothing published yet".
+    if (previous != null
       && previous.kind === 'turn'
       && previous.turn === state.turn
       && previous.key === DIAGRAMS_KIND

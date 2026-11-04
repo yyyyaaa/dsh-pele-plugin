@@ -309,6 +309,14 @@ describe('mermaid client plugin', () => {
     expect(fold.match({ type: 'tool/result', seq: 14, data: { turn: 4, message: { isError: true, source: { kind: 'tool', callId: 'call-1' } } } })).toBeNull()
     expect(fold.match({ type: 'turn/start', seq: 10, data: { turn: 4 } })).toEqual({ id: '4', role: 'start' })
 
+    // The assembler stores whatever this returns and passes it back as
+    // `previous`; a null handed back used to dereference and abort the flush.
+    expect(fold.buildLocationData({ state }, 'step', null)).toBeNull()
+    expect(fold.buildLocationData({ state }, 'turn', null)).not.toBeNull()
+
+    const empty = fold.start({ state: undefined }, { event: { type: 'turn/start', seq: 20, data: { turn: 9 } } })
+    expect(fold.buildLocationData({ state: empty }, 'turn', null)).toBeNull()
+
     const published = required(fold.buildLocationData({ state }, 'turn', undefined) ?? undefined, 'published turn data')
     expect(published.key).toBe('mermaid-diagrams')
     expect(published.turn).toBe(4)
@@ -325,6 +333,14 @@ describe('mermaid client plugin', () => {
     }
     let state = fold.start({ state: undefined }, { event: { type: 'turn/start', seq: 10, data: { turn: 4 } } })
     state = fold.update({ state }, { event: callEvent })
+    // The assembler stores whatever this returns and passes it back as
+    // `previous`; a null handed back used to dereference and abort the flush.
+    expect(fold.buildLocationData({ state }, 'step', null)).toBeNull()
+    expect(fold.buildLocationData({ state }, 'turn', null)).not.toBeNull()
+
+    const empty = fold.start({ state: undefined }, { event: { type: 'turn/start', seq: 20, data: { turn: 9 } } })
+    expect(fold.buildLocationData({ state: empty }, 'turn', null)).toBeNull()
+
     const published = required(fold.buildLocationData({ state }, 'turn', undefined) ?? undefined, 'published turn data')
 
     await render(React.createElement(required(tailSlot, 'turn tail').Component, {
@@ -353,6 +369,14 @@ describe('mermaid client plugin', () => {
     }
     let state = fold.start({ state: undefined }, { event: { type: 'turn/start', seq: 10, data: { turn: 4 } } })
     state = fold.update({ state }, { event: callEvent })
+    // The assembler stores whatever this returns and passes it back as
+    // `previous`; a null handed back used to dereference and abort the flush.
+    expect(fold.buildLocationData({ state }, 'step', null)).toBeNull()
+    expect(fold.buildLocationData({ state }, 'turn', null)).not.toBeNull()
+
+    const empty = fold.start({ state: undefined }, { event: { type: 'turn/start', seq: 20, data: { turn: 9 } } })
+    expect(fold.buildLocationData({ state: empty }, 'turn', null)).toBeNull()
+
     const published = required(fold.buildLocationData({ state }, 'turn', undefined) ?? undefined, 'published turn data')
 
     await render(React.createElement(required(tailSlot, 'turn tail').Component, {

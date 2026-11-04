@@ -109,7 +109,8 @@ export interface ConversationDefinition<State> {
   buildLocationData(
     context: DefinitionContext<State>,
     scope: 'turn' | 'step',
-    previous: PublishedTurnData<unknown> | undefined,
+    /** The value this method returned for the same scope last time, or null. */
+    previous: PublishedTurnData<unknown> | null | undefined,
   ): PublishedTurnData<unknown> | null
 }
 

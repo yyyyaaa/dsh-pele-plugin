@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2 — 2026-11-04
+
+### Fixed
+
+- `buildLocationData` no longer dereferences `null`. The conversation assembler passes `null`, not `undefined`, for "nothing published yet", and it stores our return value and hands it back as `previous` on the next flush. Our guard tested `!== undefined`, so the second flush threw `Cannot read properties of null (reading 'kind')`, which aborted the assembler's publish and left the transcript with only the nodes it had already materialized. The Definition type now declares `null` as well, so the compiler enforces the check.
+
 ## 0.2.1 — 2026-11-04
 
 ### Fixed
