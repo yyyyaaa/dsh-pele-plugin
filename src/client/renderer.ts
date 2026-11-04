@@ -4,8 +4,8 @@
  * Pele ships as its own package-local chunk, so the browser only downloads it
  * once, on the first diagram, and one failed fetch does not poison later cards.
  */
-import type { MountOptions, Mounted, ZoomOptions } from 'pele'
-import type { ModuleRequire, Translate } from './types.ts'
+import type { MountOptions, Mounted } from 'pele'
+import type { ModuleRequire } from './types.ts'
 
 /** Path of the chunk relative to this bundle, as `require.async` resolves it. */
 const CHUNK = './client.pele.js'
@@ -19,7 +19,7 @@ export interface PeleModule {
 /** The renderer seam: the UI never touches `require` or mount options directly. */
 export interface Renderer {
   load(): Promise<PeleModule>
-  mountOptions(t: Translate): MountOptions
+  mountOptions(): MountOptions
 }
 
 /** Reject a chunk that does not carry the two functions the card needs. */
@@ -27,20 +27,6 @@ function isPeleModule(value: unknown): value is PeleModule {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Partial<PeleModule>
   return typeof candidate.mount === 'function' && typeof candidate.detectType === 'function'
-}
-
-/**
- * Pele owns zoom: `always` keeps its in/out/reset knobs mounted, and pan, pinch,
- * wheel, and keyboard gestures come with them.
- * @param t - the plugin's translator.
- * @returns the zoom configuration shared by the card and the fullscreen view.
- */
-function zoomOptions(t: Translate): ZoomOptions {
-  return {
-    always: true,
-    maxScale: 4,
-    labels: { zoomIn: t('zoom.in'), zoomOut: t('zoom.out'), reset: t('zoom.reset') },
-  }
 }
 
 /**
@@ -66,8 +52,12 @@ export function createRenderer(require: ModuleRequire): Renderer {
       }
       return pending
     },
-    mountOptions(t: Translate): MountOptions {
-      return { links: false, images: false, zoom: zoomOptions(t) }
+    mountOptions(): MountOptions {
+      // Pele keeps the gestures but draws no controls of its own: every control
+      // this plugin offers lives in one toolbar, so it cannot scatter.
+      // `always` also lifts Pele's "only zoom a diagram that overflows" guard,
+      // which would otherwise make the toolbar buttons dead on a small diagram.
+      return { links: false, images: false, zoom: { controls: false, always: true, maxScale: 4 } }
     },
   }
 }

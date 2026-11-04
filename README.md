@@ -10,7 +10,7 @@ Pele renders every diagram type built into Mermaid 12, ships no dependencies, an
 
 - A card per diagram in the conversation, with the diagram type, a title you can pass, and a copy-the-source action.
 - The same diagram again at the end of the turn. A completed turn folds its process rows, so the card alone would disappear; the turn-tail copy is what stays visible.
-- Zoom in, zoom out, and reset on every card, plus drag-to-pan, pinch, `+` / `-` / `0` / `Esc`, and a fullscreen view that opens above every column.
+- One toolbar on every card: zoom out, zoom in, reset, fullscreen, and copy as identical 24px buttons, so nothing floats over the diagram and nothing appears only on hover. Drag-to-pan, pinch, and the `+` / `-` / `0` / `Esc` shortcuts still work on the diagram itself.
 - Failures stay in the card: the tool error, including the position Pele reported.
 
 ## Requirements

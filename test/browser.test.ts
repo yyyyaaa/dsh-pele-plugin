@@ -253,13 +253,38 @@ describe('mermaid client plugin', () => {
     expect(Number(svg.getAttribute('width'))).toBeGreaterThan(0)
   })
 
-  it('keeps Pele zoom knobs mounted and localized', async () => {
+  it('keeps every control in one toolbar', async () => {
     await render(React.createElement(required(toolSlot, 'tool view').Component, settled({ source: SOURCE })))
-    await waitForElement(container, '.pele-zoom')
-    const knobs = container.querySelectorAll('.pele-zoom button')
-    expect(knobs).toHaveLength(3)
-    expect(knobs[0]?.getAttribute('aria-label')).toBe('Zoom in')
-    expect(knobs[2]?.getAttribute('aria-label')).toMatch(/Reset/)
+    await waitForElement(container, '.dsh-mermaid-body svg')
+
+    expect(container.querySelectorAll('.dsh-mermaid-toolbar')).toHaveLength(1)
+    expect(container.querySelector('.pele-zoom')).toBeNull()
+
+    const toolbar = mustQuery<HTMLElement>('.dsh-mermaid-toolbar')
+    expect(toolbar.querySelectorAll('button')).toHaveLength(5)
+    expect(mustQuery('[data-mermaid-zoom="out"]').getAttribute('aria-label')).toBe('Zoom out')
+    expect(mustQuery('[data-mermaid-zoom="in"]').getAttribute('aria-label')).toBe('Zoom in')
+    expect(mustQuery('[data-mermaid-zoom="reset"]').getAttribute('aria-label')).toBe('Reset zoom')
+    expect(container.querySelector('[data-mermaid-fullscreen]')).not.toBeNull()
+    expect(container.querySelector('[data-mermaid-copy]')).not.toBeNull()
+  })
+
+  it('zooms the diagram from the toolbar', async () => {
+    await render(React.createElement(required(toolSlot, 'tool view').Component, settled({ source: SOURCE })))
+    const svg = await waitForElement<SVGElement>(container, '.dsh-mermaid-body svg')
+    const before = svg.style.width
+
+    await act(async () => {
+      mustQuery<HTMLElement>('[data-mermaid-zoom="in"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(svg.style.width).not.toBe(before)
+
+    await act(async () => {
+      mustQuery<HTMLElement>('[data-mermaid-zoom="reset"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(svg.style.width).toBe(before)
   })
 
   it('folds mermaid calls into turn data and drops failed ones', () => {
@@ -345,6 +370,7 @@ describe('mermaid client plugin', () => {
     const dialog = mustQuery<HTMLElement>('[role="dialog"]')
     await waitForElement(dialog, 'svg.pele')
     expect(dialog.querySelector('[data-mermaid-close]')).not.toBeNull()
+    expect(dialog.querySelector('[data-mermaid-zoom="in"]')).not.toBeNull()
     expect(document.documentElement.style.overflow).toBe('hidden')
 
     await act(async () => {

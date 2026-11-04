@@ -12,7 +12,8 @@ import type { PeleModule, Renderer } from './renderer.ts'
 import type { TurnLike } from './dataset.ts'
 import { diagramsOf } from './dataset.ts'
 import type { IconName } from './icons.ts'
-import { ICON_PATHS } from './icons.ts'
+import { ICONS } from './icons.ts'
+import type { Zoom } from 'pele'
 
 /** Props the keyed `tool.call.toolview` slot passes to one call view. */
 export interface ToolViewProps {
@@ -37,6 +38,9 @@ export interface Ui {
   readonly DiagramTail: Component<TurnTailProps>
   readonly FullscreenOverlay: Component<OverlayProps>
 }
+
+/** One zoom step, matching the 1.25 × 1.25 Pele's own controls used. */
+const ZOOM_STEP = 1.5625
 
 /**
  * What one tool call should show, derived before any rendering.
@@ -145,19 +149,23 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
   const h = React.createElement
   const fullscreen = createFullscreenStore()
 
-  /** A 16×16 glyph drawn with `currentColor`. */
-  function Icon({ name, size = 12 }: { readonly name: IconName; readonly size?: number }) {
+  /** One glyph, drawn on its own grid with `currentColor`. */
+  function Icon({ name, size = 14 }: { readonly name: IconName; readonly size?: number }) {
+    const glyph = ICONS[name]
+    // Stroke width lives in viewBox units, so a 24-grid glyph would draw at 2/3
+    // the weight of a 16-grid one at the same size. Normalize to a 1.3px stroke.
+    const strokeWidth = (1.3 * glyph.box) / size
     return h('svg', {
       className: 'dsh-mermaid-icon',
       width: size,
       height: size,
-      viewBox: '0 0 16 16',
+      viewBox: `0 0 ${glyph.box} ${glyph.box}`,
       fill: 'none',
       'aria-hidden': 'true',
     }, h('path', {
-      d: ICON_PATHS[name],
+      d: glyph.d,
       stroke: 'currentColor',
-      strokeWidth: 1.3,
+      strokeWidth,
       strokeLinecap: 'round',
       strokeLinejoin: 'round',
     }))
@@ -178,6 +186,42 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
       onClick,
       ...attribute,
     }, h(Icon, { name: icon }))
+  }
+
+  /** One run of controls inside the toolbar. */
+  function Group({ children }: { readonly children?: ReactTypes.ReactNode }) {
+    return h('span', { className: 'dsh-mermaid-group' }, children)
+  }
+
+  /** The single control bar every card shares, so controls cannot scatter. */
+  function Toolbar({ children }: { readonly children?: ReactTypes.ReactNode }) {
+    return h('span', { className: 'dsh-mermaid-toolbar' }, children)
+  }
+
+  /** The zoom run: the same three steps Pele's own controls used. */
+  function ZoomControls({ zoomRef, t }: {
+    readonly zoomRef: ReactTypes.MutableRefObject<Zoom | undefined>
+    readonly t: Translate
+  }) {
+    return h(Group, null,
+      h(ActionButton, {
+        label: t('zoom.out'),
+        icon: 'zoomOut',
+        attribute: { 'data-mermaid-zoom': 'out' },
+        onClick: () => zoomRef.current?.zoomBy(1 / ZOOM_STEP),
+      }),
+      h(ActionButton, {
+        label: t('zoom.in'),
+        icon: 'zoomIn',
+        attribute: { 'data-mermaid-zoom': 'in' },
+        onClick: () => zoomRef.current?.zoomBy(ZOOM_STEP),
+      }),
+      h(ActionButton, {
+        label: t('zoom.reset'),
+        icon: 'reset',
+        attribute: { 'data-mermaid-zoom': 'reset' },
+        onClick: () => zoomRef.current?.reset(),
+      }))
   }
 
   /** Resolve the Pele chunk once per card, keeping a failure visible. */
@@ -217,22 +261,24 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
         timer.current = setTimeout(() => setCopied(false), 1400)
       }, () => {})
     }
+    const label = copied ? t('card.copied') : t('card.copy')
     return h('button', {
       type: 'button',
-      className: 'dsh-mermaid-action dsh-mermaid-copy',
-      title: t('card.copy'),
-      'aria-label': t('card.copy'),
+      className: 'dsh-mermaid-action',
+      title: label,
+      'aria-label': label,
+      'data-mermaid-copy': '',
       onClick: copy,
-    }, h(Icon, { name: copied ? 'check' : 'copy' }), h('span', null, copied ? t('card.copied') : t('card.copy')))
+    }, h(Icon, { name: copied ? 'check' : 'copy' }))
   }
 
-  /** Mount one Pele diagram into a stable container. */
-  function DiagramBody({ pele, source, t, fill = false, fit = false }: {
+  /** Mount one Pele diagram into a stable container and hand its zoom to the toolbar. */
+  function DiagramBody({ pele, source, fill = false, fit = false, onZoom }: {
     readonly pele: PeleModule
     readonly source: string
-    readonly t: Translate
     readonly fill?: boolean
     readonly fit?: boolean
+    readonly onZoom?: (zoom: Zoom | undefined) => void
   }) {
     const host = React.useRef<HTMLDivElement | null>(null)
     React.useEffect(() => {
@@ -246,7 +292,8 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
       }
       let mounted: ReturnType<PeleModule['mount']> | undefined
       try {
-        mounted = pele.mount(element, source, renderer.mountOptions(t))
+        mounted = pele.mount(element, source, renderer.mountOptions())
+        onZoom?.(mounted.zoom)
         if (mounted.error !== undefined) {
           show(mounted.error)
         } else if (fit && mounted.zoom !== undefined) {
@@ -256,7 +303,7 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
           const room = element.clientWidth
           if (natural > 0 && room > natural * 1.05) {
             try {
-              mounted.zoom.zoomTo(Math.min(2, room / natural))
+              mounted.zoom.zoomTo(Math.min(1.5, room / natural))
             } catch {}
           }
         }
@@ -264,22 +311,21 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
         show(error)
       }
       return () => {
+        onZoom?.(undefined)
         try {
           mounted?.destroy()
         } catch {}
       }
-    }, [pele, source, t, fit])
+    }, [pele, source, fit, onZoom])
     return h('div', {
       ref: host,
       className: fill ? 'dsh-mermaid-body dsh-mermaid-body-fill' : 'dsh-mermaid-body',
     })
   }
 
-  /** Card chrome shared by every state: title row, type chip, actions, body. */
-  function Frame({ title, source, t, chip = null, actions = null, body, panel = false }: {
+  /** Card chrome shared by every state: title row, type chip, control bar, body. */
+  function Frame({ title, chip = null, actions = null, body, panel = false }: {
     readonly title: string
-    readonly source: string
-    readonly t: Translate
     readonly chip?: string | null
     readonly actions?: ReactTypes.ReactNode
     readonly body: ReactTypes.ReactNode
@@ -290,17 +336,21 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
       // Only the card is a tool row; the overlay panel is not.
       'data-tool': panel ? undefined : 'mermaid',
     },
-      h('div', { className: 'dsh-mermaid-head' },
-        h(Icon, { name: 'diagram', size: 14 }),
-        h('span', { className: 'dsh-mermaid-title' }, title),
-        chip === null ? null : h('span', { className: 'dsh-mermaid-chip' }, chip),
-        h('span', { className: 'dsh-mermaid-actions' },
-          actions,
-          source === '' ? null : h(CopyButton, { source, t }))),
-      body)
+    h('div', { className: 'dsh-mermaid-head' },
+      h(Icon, { name: 'diagram', size: 14 }),
+      h('span', { className: 'dsh-mermaid-title' }, title),
+      chip === null ? null : h('span', { className: 'dsh-mermaid-chip' }, chip),
+      h('span', { className: 'dsh-mermaid-head-actions' }, actions)),
+    body)
   }
 
-  /** One drawable diagram: resolves Pele, then renders the card or the overlay panel. */
+  /**
+   * One drawable diagram.
+   *
+   * Every control lives in a single toolbar: zoom comes from the mounted Pele
+   * instance, fullscreen and copy from the plugin. Pele draws no controls of its
+   * own, so nothing floats over the diagram and no button lives outside the bar.
+   */
   function DiagramView({ source, title, t, panel = false }: {
     readonly source: string
     readonly title: string
@@ -308,14 +358,19 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
     readonly panel?: boolean
   }) {
     const { pele, error } = usePele()
+    const zoomRef = React.useRef<Zoom | undefined>(undefined)
+    const onZoom = React.useCallback((zoom: Zoom | undefined) => {
+      zoomRef.current = zoom
+    }, [])
     const chip = pele === undefined ? null : pele.detectType(source) ?? 'mermaid'
+
     const body = error !== undefined
       ? h('div', { className: 'dsh-mermaid-note dsh-mermaid-note-error' }, `${t('card.rendererFailed')} ${error}`)
       : pele === undefined
         ? h('div', { className: 'dsh-mermaid-note', role: 'status' }, t('card.rendererLoading'))
-        : h(DiagramBody, { pele, source, t, fill: panel, fit: panel })
+        : h(DiagramBody, { pele, source, fill: panel, fit: panel, onZoom })
 
-    const actions = panel
+    const viewAction = panel
       ? h(ActionButton, {
         label: t('card.exitFullscreen'),
         icon: 'close',
@@ -329,7 +384,13 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
         onClick: () => fullscreen.open({ source, title }),
       })
 
-    return h(Frame, { title: title || t('card.title'), source, t, chip, actions, body, panel })
+    const copy = source === '' ? null : h(CopyButton, { source, t })
+    const actions = h(Toolbar, null,
+      h(ZoomControls, { zoomRef, t }),
+      // The overlay puts close last so it sits at the far edge, like a window control.
+      h(Group, null, panel ? copy : viewAction, panel ? viewAction : copy))
+
+    return h(Frame, { title: title || t('card.title'), chip, actions, body, panel })
   }
 
   /**
@@ -344,16 +405,15 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
     if (state.kind === 'failed') {
       return h(Frame, {
         title: t('card.error'),
-        source: state.source,
-        t,
         body: h('pre', { className: 'dsh-mermaid-error' }, state.message || t('card.error')),
+        actions: state.source === ''
+          ? null
+          : h(Toolbar, null, h(Group, null, h(CopyButton, { source: state.source, t }))),
       })
     }
     if (state.kind === 'preparing') {
       return h(Frame, {
         title: t('card.title'),
-        source: '',
-        t,
         body: h('div', { className: 'dsh-mermaid-note', role: 'status' }, t('card.preparing')),
       })
     }

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Every diagram control now lives in a single toolbar at the top right of the card: zoom out, zoom in, reset, fullscreen, and copy, all the same 24px icon button. Pele's floating controls are disabled.
+- The copy action is always visible instead of fading in on hover, so the header no longer reserves blank space.
+- The fullscreen view scrolls tall diagrams and centers the diagram in the frame.
+
 ## 0.1.0 — 2026-11-04
 
 Initial release.
