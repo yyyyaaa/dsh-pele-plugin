@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Mermaid 图表",
+    "description": "使用 Pele 渲染器把 Mermaid 图表渲染为可跟随主题的 SVG 卡片并显示在对话中。"
+  }
+}

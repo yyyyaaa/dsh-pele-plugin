@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Mermaid Diagrams",
+    "description": "Renders Mermaid diagrams as themeable SVG cards in the chat with the Pele renderer."
+  }
+}
