@@ -1,23 +1,54 @@
 {
-  "name": "@local/mermaid-pele",
+  "name": "@phatg/dsh-pele",
   "version": "0.1.0",
-  "private": true,
-  "description": "Render Mermaid diagrams as themeable SVG cards in the Harness chat, using Pele.",
+  "description": "Mermaid diagrams as themeable SVG cards in the DeepSeek Harness chat, rendered with Pele.",
   "type": "module",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./index.js",
-    "./client": "./client.js",
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
-    "index.js",
-    "client.js",
-    "client.pele.js",
+    "dist/index.js",
+    "dist/client.js",
+    "dist/client.pele.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg"
   ],
+  "scripts": {
+    "build": "node scripts/build.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm build && pnpm typecheck && pnpm test",
+    "prepare": "pnpm build",
+    "prepack": "pnpm build"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "mermaid",
+    "pele",
+    "diagrams",
+    "svg"
+  ],
+  "author": "Phat (https://github.com/yyyyaaa)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yyyyaaa/dsh-pele-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yyyyaaa/dsh-pele-plugin/issues"
+  },
+  "homepage": "https://github.com/yyyyaaa/dsh-pele-plugin#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "pele": "^1.13.0"
   },
@@ -44,9 +75,16 @@
     }
   },
   "devDependencies": {
-    "esbuild": "^0.28.2",
-    "jsdom": "^30.1.3",
+    "@types/node": "^26.6.6",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitest/browser": "5.1.0",
+    "@vitest/browser-playwright": "5.1.0",
+    "playwright": "1.64.1",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "rolldown": "1.2.16",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
   }
 }
