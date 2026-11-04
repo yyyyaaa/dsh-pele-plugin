@@ -1,6 +1,6 @@
 {
   "name": "@phatg/dsh-pele",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Mermaid diagrams as themeable SVG cards in the DeepSeek Harness chat, rendered with Pele.",
   "type": "module",
   "main": "./dist/index.js",
