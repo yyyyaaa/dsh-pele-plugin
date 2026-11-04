@@ -121,13 +121,6 @@ export interface ToolCallData {
   readonly arguments: string
 }
 
-/** Tool-result data: which call settled, and whether it failed. */
-export interface ToolResultData {
-  readonly turn: number
-  readonly callId: string
-  readonly failed: boolean
-}
-
 declare global {
   interface Window {
     __ModuleLoader__?: { load(registration: ClientRegistration): void }

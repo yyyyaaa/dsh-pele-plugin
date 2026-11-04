@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 — 2026-11-04
+
+### Fixed
+
+- The turn-data definition now claims only `turn/start` and `mermaid` tool calls. It used to match every `tool/result` in the session, which is the widest possible claim on the conversation event stream and could collide with the assembler when a turn's start was not in the loaded window.
+- The definition publishes nothing for turns without diagrams, and compares published diagrams by value, so a replay window that rebuilds equal data does not look like a change.
+- `start` no longer throws when handed an event that is not `turn/start`.
+- Every view the plugin registers is wrapped in an error boundary with a local fallback, so a rendering failure inside a card can no longer take the transcript with it.
+
 ## 0.2.0 — 2026-11-04
 
 ### Changed

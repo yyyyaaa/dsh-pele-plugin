@@ -304,12 +304,11 @@ describe('mermaid client plugin', () => {
     expect(state?.diagrams[0]?.source).toBe(SOURCE)
     expect(state?.diagrams[0]?.title).toBe('Tail diagram')
 
-    const failed = fold.update({ state }, {
-      event: { type: 'tool/result', seq: 14, data: { turn: 4, message: { isError: true, source: { kind: 'tool', callId: 'call-1' } } } },
-    })
-    expect(failed?.diagrams).toHaveLength(0)
+    // The fold owns only `turn/start` and `mermaid` calls: a tool result for
+    // another tool must not be claimed by this definition.
+    expect(fold.match({ type: 'tool/result', seq: 14, data: { turn: 4, message: { isError: true, source: { kind: 'tool', callId: 'call-1' } } } })).toBeNull()
+    expect(fold.match({ type: 'turn/start', seq: 10, data: { turn: 4 } })).toEqual({ id: '4', role: 'start' })
 
-    state = fold.update({ state: failed }, { event: callEvent })
     const published = required(fold.buildLocationData({ state }, 'turn', undefined) ?? undefined, 'published turn data')
     expect(published.key).toBe('mermaid-diagrams')
     expect(published.turn).toBe(4)

@@ -149,6 +149,35 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
   const h = React.createElement
   const fullscreen = createFullscreenStore()
 
+  /**
+   * Swallow one view's render failure.
+   *
+   * A diagram card is an addition to the host's chat; an exception inside it
+   * must never take the transcript down with it, so every entry this plugin
+   * registers is wrapped in this boundary.
+   */
+  class Boundary extends React.Component<{ readonly fallback?: ReactTypes.ReactNode; readonly children?: ReactTypes.ReactNode }, { readonly failed: boolean }> {
+    override state = { failed: false }
+
+    static getDerivedStateFromError() {
+      return { failed: true }
+    }
+
+    override render() {
+      return this.state.failed ? this.props.fallback ?? null : this.props.children
+    }
+  }
+
+  /** Wrap one view so its failure renders its own fallback instead of escaping. */
+  function guarded<P extends object>(
+    View: (props: P) => ReactTypes.ReactElement | null,
+    fallback?: (props: P) => ReactTypes.ReactNode,
+  ) {
+    return function Guarded(props: P): ReactTypes.ReactElement | null {
+      return h(Boundary, { fallback: fallback?.(props) ?? null }, h(View, props))
+    }
+  }
+
   /** One glyph, drawn on its own grid with `currentColor`. */
   function Icon({ name, size = 14 }: { readonly name: IconName; readonly size?: number }) {
     const glyph = ICONS[name]
@@ -362,7 +391,14 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
     const onZoom = React.useCallback((zoom: Zoom | undefined) => {
       zoomRef.current = zoom
     }, [])
-    const chip = pele === undefined ? null : pele.detectType(source) ?? 'mermaid'
+    let chip: string | null = null
+    if (pele !== undefined) {
+      try {
+        chip = pele.detectType(source) ?? 'mermaid'
+      } catch {
+        chip = 'mermaid'
+      }
+    }
 
     const body = error !== undefined
       ? h('div', { className: 'dsh-mermaid-note dsh-mermaid-note-error' }, `${t('card.rendererFailed')} ${error}`)
@@ -483,5 +519,9 @@ export function createUi(React: typeof ReactTypes, renderer: Renderer): Ui {
     }, h(DiagramView, { source: view.source, title: view.title, t, panel: true }))
   }
 
-  return { MermaidCard, DiagramTail, FullscreenOverlay }
+  return {
+    MermaidCard: guarded(MermaidCard, (props) => h('div', { className: 'dsh-mermaid-note dsh-mermaid-note-error' }, props.t('card.error'))),
+    DiagramTail: guarded(DiagramTail),
+    FullscreenOverlay: guarded(FullscreenOverlay),
+  }
 }

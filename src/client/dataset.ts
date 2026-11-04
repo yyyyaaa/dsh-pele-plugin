@@ -9,7 +9,6 @@ import type {
   ConversationDefinition,
   ConversationEvent,
   ToolCallData,
-  ToolResultData,
 } from './types.ts'
 import { isRecord, parseArguments } from './json.ts'
 
@@ -53,16 +52,6 @@ function mermaidCall(event: ConversationEvent): ToolCallData | null {
   return { turn, callId, name, arguments: raw }
 }
 
-/** A settled tool result, narrowed to the fields that identify its call. */
-function toolResult(event: ConversationEvent): ToolResultData | null {
-  if (event.type !== 'tool/result' || !isRecord(event.data)) return null
-  const { turn, message } = event.data
-  if (typeof turn !== 'number' || !isRecord(message) || !isRecord(message.source)) return null
-  const source = message.source
-  if (source.kind !== 'tool' || typeof source.callId !== 'string') return null
-  return { turn, callId: source.callId, failed: message.isError === true }
-}
-
 /**
  * Read one call's diagram, or nothing when the arguments are not a diagram yet.
  * @param event - a session event, tested for the `mermaid` call shape.
@@ -78,14 +67,30 @@ function diagramOf(event: ConversationEvent): Diagram | null {
   return { callId: call.callId, source, title }
 }
 
-/** True when a previously published value still holds the same diagram array. */
+/**
+ * True when a previously published value still holds the same diagrams.
+ *
+ * Compared by value, not by array identity: the assembler may hand back a
+ * structurally equal value rebuilt from a replay window.
+ */
 function sameDiagrams(value: unknown, diagrams: readonly Diagram[]): boolean {
-  return isRecord(value) && value.diagrams === diagrams
+  if (!isRecord(value) || !Array.isArray(value.diagrams)) return false
+  const list: unknown[] = value.diagrams
+  if (list.length !== diagrams.length) return false
+  return diagrams.every((diagram, index) => {
+    const published = list[index]
+    return isRecord(published)
+      && published.callId === diagram.callId
+      && published.source === diagram.source
+      && published.title === diagram.title
+  })
 }
 
 /** The diagrams a completed turn published, validated at the boundary. */
 export function diagramsOf(turn: TurnLike | undefined): readonly Diagram[] {
-  const published = turn?.data?.get(DIAGRAMS_KIND)
+  const data = turn?.data
+  if (data === undefined || typeof data.get !== 'function') return []
+  const published = data.get(DIAGRAMS_KIND)
   if (!isRecord(published) || !Array.isArray(published.diagrams)) return []
   return published.diagrams.filter(isDiagram)
 }
@@ -112,15 +117,15 @@ export const diagramsDefinition: ConversationDefinition<DiagramsState | undefine
     if (start !== null) return { id: String(start.turn), role: 'start' }
     const call = mermaidCall(event)
     if (call !== null) return { id: String(call.turn), role: 'update' }
-    const result = toolResult(event)
-    if (result !== null) return { id: String(result.turn), role: 'update' }
     return null
   },
 
   start(_context, match) {
+    // The matcher only starts on `turn/start`, but a replay window may hand this
+    // a different event; an empty fold is safer than an exception inside the
+    // conversation assembler.
     const start = turnStart(match.event)
-    if (start === null) throw new Error('mermaid-diagrams: start requires a turn/start event')
-    return { turn: start.turn, diagrams: [] }
+    return { turn: start?.turn ?? 0, diagrams: [] }
   },
 
   update(context, match) {
@@ -133,15 +138,16 @@ export const diagramsDefinition: ConversationDefinition<DiagramsState | undefine
       return { ...state, diagrams: [...state.diagrams, diagram] }
     }
 
-    const result = toolResult(match.event)
-    if (result === null || !result.failed) return state
-    const diagrams = state.diagrams.filter((candidate) => candidate.callId !== result.callId)
-    return diagrams.length === state.diagrams.length ? state : { ...state, diagrams }
+    return state
   },
 
   buildLocationData(context, scope, previous) {
     const state = context.state
     if (scope !== 'turn' || state === undefined) return null
+    // No diagrams means no contribution: publishing an empty fold for every turn
+    // would put this plugin in the assembler's turn index for turns it never
+    // touched.
+    if (state.diagrams.length === 0) return null
     if (previous !== undefined
       && previous.kind === 'turn'
       && previous.turn === state.turn
